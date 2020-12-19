@@ -1,0 +1,1 @@
+dotnet publish -r osx.10.15-x64 -o MacBinary

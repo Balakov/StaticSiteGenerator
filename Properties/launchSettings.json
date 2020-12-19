@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "StaticSiteGenerator": {
+      "commandName": "Project",
+      "commandLineArgs": "D:\\GoogleDrive\\Mike\\Code\\MikeStimpsonWebsite --watch --serve"
+    }
+  }
+}
