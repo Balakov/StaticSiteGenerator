@@ -2,9 +2,9 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
 
 namespace StaticSiteGenerator
 {
@@ -20,37 +20,45 @@ namespace StaticSiteGenerator
 
         static void Main(string[] args)
         {
-            foreach (string arg in args)
+            for (int i=0; i < args.Length; i++)
             {
-                if (arg == "--serve")
+                string arg = args[i];
+
+                if (arg == "--serve" || arg == "-s")
                 {
                     _shouldServe = true;
                 }
-                else if (arg == "--watch")
+                else if (arg == "--watch" || arg == "-w")
                 {
                     _shouldWatch = true;
                 }
+                else if (arg == "--output" || arg == "-o" && i + 1 < args.Length)
+                {
+                    _outputDirectory = args[i + 1];
+                }
+                else if (arg == "--input" || arg == "-i" && i + 1 < args.Length)
+                {
+                    _inputDirectory = args[i + 1];
+                }
                 else
                 {
-                    _inputDirectory = arg;
+                    // Backwards compatibilty, assume unswitched argmument is input directory
+                    if (string.IsNullOrEmpty(_inputDirectory))
+                    {
+                        _inputDirectory = arg;
+                    }
                 }
             }
 
             if (string.IsNullOrEmpty(_inputDirectory))
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    //_inputDirectory = @"/Users/mikestimpson/Google Drive File Stream/My Drive/Mike/Code/FoghornWebsite";
-                    _inputDirectory = @"/Users/mikestimpson/Google Drive File Stream/My Drive/Mike/Code/FoghornWebsiteMarkdown";
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                {
-                    _inputDirectory = @"D:\GoogleDrive\Mike\Code\FoghornWebsite";
-                    //_inputDirectory = @"D:\GoogleDrive\Mike\Code\FoghornWebsiteMarkdown";
-                }
+                Console.WriteLine("Usage: StaticSiteGenerator --input <directory> [--output <directory>] [--watch] [--serve]");
             }
 
-            _outputDirectory = Path.Combine(_inputDirectory, c_outputDirectory);
+            if (string.IsNullOrEmpty(_outputDirectory))
+            {
+                _outputDirectory = Path.Combine(_inputDirectory, c_outputDirectory);
+            }
 
             GenerateSite(_shouldWatch && _shouldServe);
 
