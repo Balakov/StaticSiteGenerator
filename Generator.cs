@@ -16,6 +16,28 @@ namespace StaticSiteGenerator
             public StringBuilder Content { get; set; } = new();
         }
 
+        public class FileProcessContext
+        {
+            public string InputFilePath { get; set; }
+            public string RootFilePath { get; set; }
+            public StringReader InputFileContents { get; set; }
+            public List<ContentSection> Sections { get; set; } = new List<ContentSection>();
+        }
+
+        public class PathResolveResult
+        {
+            public enum StatusType
+            {
+                Success,
+                Failure
+            };
+
+            public StatusType Status { get; set; } = StatusType.Failure;
+            public string ResolvedPath { get; set; }
+            public string RequestedFile { get; set; }
+            public List<string> PathsSearched { get; set; } = new();
+        }
+
         private const string c_includeDirectory = "include";
         private const string c_layoutDirectory = "layout";
         private const string c_assetsDirectory = "assets";
@@ -26,6 +48,7 @@ namespace StaticSiteGenerator
         private string _inputDirectory;
         private string _outputDirectory;
         private bool _includeDebug;
+        private static bool _debugLogEnabled = false;
 
         private readonly Markdown _markdown = new Markdown();
 
@@ -102,12 +125,11 @@ namespace StaticSiteGenerator
                     // fix up any relative asset paths.
                     int depthFromRoot = string.IsNullOrEmpty(relativePath) ? 0 : relativePath.Split('/', '\\').Length;
 
-                    string processedHTML = ProcessFile(file, null);
+                    string processedHTML = ProcessRootFile(file);
 
                     bool addToSitemap = !File.Exists(Path.Combine(Path.GetDirectoryName(file), "norobots.txt"));
                     if (addToSitemap)
                     {
-
                         if (depthFromRoot > 0)
                         {
                             siteURLs.Add(relativePath + "/" + outputFileName);
@@ -255,33 +277,55 @@ namespace StaticSiteGenerator
             return fileList;
         }
 
-        private string ProcessFile(string inputFilePath, List<ContentSection> contentSectionsToInsert)
+        private string ProcessRootFile(string inputFilePath)
         {
+            DebugLog($"Processing root file {inputFilePath}");
+
+            StringReader fileContentsReader;
+
             if (Path.GetExtension(inputFilePath) == ".md")
             {
                 string markdownContents = _markdown.Transform(SafeFileReader.ReadAllText(inputFilePath));
-
-                return ProcessFile(inputFilePath, new StringReader(markdownContents), contentSectionsToInsert);
+                fileContentsReader = new StringReader(markdownContents);
             }
             else
             {
-                return ProcessFile(inputFilePath, new StringReader(SafeFileReader.ReadAllText(inputFilePath)), contentSectionsToInsert);
+                fileContentsReader = new StringReader(SafeFileReader.ReadAllText(inputFilePath));
             }
+
+            FileProcessContext context = new()
+            {
+                RootFilePath = inputFilePath,
+                InputFilePath = inputFilePath,
+                InputFileContents = fileContentsReader
+            };
+
+            return ProcessFile(context);
         }
 
-        private string ProcessFile(string inputFilePath, StringReader inputFileContents, List<ContentSection> contentSectionsToInsert)
+        private string ProcessLayoutFile(string layoutFilePath, FileProcessContext context)
         {
-            List<ContentSection> sections = new();
+            FileProcessContext layoutContext = new()
+            {
+                Sections = context.Sections,
+                RootFilePath = context.RootFilePath,
+                InputFilePath = layoutFilePath,
+                InputFileContents = new StringReader(SafeFileReader.ReadAllText(layoutFilePath))
+            };
 
-            // Add a default content section that all of the content that isn't inside a named section will be placed into.
-            ContentSection defaultContentSection = new() { Name = "content" };
-            sections.Add(defaultContentSection);
-            
-            ContentSection currentContentSection = defaultContentSection;
+            return ProcessFile(layoutContext);
+        }
+
+        private string ProcessFile(FileProcessContext context)
+        {
+            DebugLog($"    Processing file {context.InputFilePath}");
+
+            StringBuilder currentOutput = new StringBuilder();
+            ContentSection currentSection = null;
 
             string layoutToUse = null;
 
-            if (inputFilePath != null && Path.GetExtension(inputFilePath) == ".md")
+            if (context.InputFilePath != null && Path.GetExtension(context.InputFilePath) == ".md")
             {
                 // You can set the layout in a markdown file in the same way as an HTML file with the {{ layout }}
                 // command, but to make a site from just markdown files as easy as possible we'll pick the first HTML
@@ -301,10 +345,34 @@ namespace StaticSiteGenerator
 
             string line;
             int lineCount = 0;
-            while((line = inputFileContents.ReadLine()) != null)
+            while((line = context.InputFileContents.ReadLine()) != null)
             {
                 lineCount++;
 
+                // Multi-line support
+                if (line.Contains("{{") && !line.Contains("}}"))
+                {
+                    bool foundClosingMarker = false;
+                    while (!foundClosingMarker)
+                    {
+                        string continuationLine = context.InputFileContents.ReadLine();
+
+                        if (continuationLine != null)
+                        {
+                            line += continuationLine;
+                            if (continuationLine.Contains("}}"))
+                            {
+                                foundClosingMarker = true;
+                            }
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                // Variable setter
                 if (line.StartsWith("$("))
                 {
                     _variableStack.AddVariable(line);
@@ -323,7 +391,16 @@ namespace StaticSiteGenerator
                         }
                         else if (command == "debug-vars" || command == "dump-vars")
                         {
-                            return "<ul>" + _variableStack.Print("<li>", "</li>") + "</ul>";
+                            StringBuilder debugOutput = new("<h5>Variables</h5><ul>" + _variableStack.Print("<li>", "</li>") + "</ul>");
+
+                            debugOutput.AppendLine("<h5>Sections</h5><ul>");
+                            foreach (var section in context.Sections)
+                            {
+                                debugOutput.AppendLine($"<li>{section.Name}</li>");
+                            }
+                            debugOutput.AppendLine("</ul>");
+
+                            return debugOutput.ToString();
                         }
                         else if (command == "layout")
                         {
@@ -332,22 +409,42 @@ namespace StaticSiteGenerator
                         }
                         else if (command == "section" && parts.Length > 1)
                         {
-                            ContentSection newSection = new() { Name = parts[1] };
-                            sections.Add(newSection);
-                            currentContentSection = newSection;
+                            if (currentSection != null)
+                            {
+                                return OutputHTMLError($"Nesting not allowed. Attempt to nest section \"{parts[1]}\" inside section \"{currentSection.Name}\"", context.InputFilePath, lineCount);
+                            }
+                            else if (parts[1].ToLower() == "content")
+                            {
+                                return OutputHTMLError($"Section 'content' is a reserved name and may not be used.", context.InputFilePath, lineCount);
+                            }
+                            else
+                            {
+                                currentSection = new() { Name = parts[1] };
+                                context.Sections.Add(currentSection);
+                            }
                         }
                         else if (command == "endsection")
                         {
                             // If the current section was a markdown section then paste it in-place and remove the section
-                            if (currentContentSection.Name == "markdown")
+                            if (currentSection?.Name == "markdown")
                             {
-                                string markdownContent = _markdown.Transform(currentContentSection.Content.ToString());
-                                string processedHTMLContent = ProcessFile(null, new StringReader(markdownContent), null);
-                                defaultContentSection.Content.AppendLine(processedHTMLContent);
-                                sections.Remove(currentContentSection);
+                                string markdownContent = _markdown.Transform(currentSection.Content.ToString());
+
+                                FileProcessContext markdownContext = new()
+                                {
+                                    InputFileContents = new StringReader(markdownContent),
+                                    RootFilePath = context.RootFilePath
+                                };
+
+                                string processedHTMLContent = ProcessFile(markdownContext);
+
+                                // Write into the default section
+                                currentOutput.AppendLine(processedHTMLContent);
+                                context.Sections.Remove(currentSection);
                             }
 
-                            currentContentSection = defaultContentSection;
+                            // Revert back to the default section. We don't support nesting of sections
+                            currentSection = null;
                         }
                         else if ((command == "include" && parts.Length > 1) ||
                                  ((command == "include-debug" || command == "includedebug")  && parts.Length > 1) ||
@@ -382,20 +479,21 @@ namespace StaticSiteGenerator
 
                                 List<string> includePaths = new();
 
-                                // Search for a local include directory before looking in the global one.
-                                if (inputFilePath != null)
+                                // Search the immediate directory and a local include directory before looking in the global one.
+                                if (context.InputFilePath != null)
                                 {
-                                    includePaths.Add(Path.Combine(Path.GetDirectoryName(inputFilePath), c_includeDirectory));
+                                    includePaths.Add(Path.GetDirectoryName(context.InputFilePath));
+                                    includePaths.Add(Path.Combine(Path.GetDirectoryName(context.RootFilePath), c_includeDirectory));
                                 }
 
                                 // Add the global include path
                                 includePaths.Add(Path.Combine(_inputDirectory, c_includeDirectory));
 
-                                string includePath = ResolveFilePath(includePaths, param.Replace('\\', '/'));
+                                var resolveResult = ResolveFilePath(includePaths, param.Replace('\\', '/'));
 
                                 string returnValue;
 
-                                if (includePath != null)
+                                if (resolveResult.Status == PathResolveResult.StatusType.Success)
                                 {
                                     // Create a new variable context before we add any paramters so that the new values
                                     // are only accessbile to the included file
@@ -409,30 +507,33 @@ namespace StaticSiteGenerator
 
                                     if (param.ToLower().EndsWith(".md"))
                                     {
-                                        returnValue = _markdown.Transform(SafeFileReader.ReadAllText(includePath));
+                                        returnValue = _markdown.Transform(SafeFileReader.ReadAllText(resolveResult.ResolvedPath));
                                     }
                                     else if (param.ToLower().EndsWith(".html"))
                                     {
-                                        returnValue = ProcessFile(includePath, null);
+                                        FileProcessContext includeContext = new()
+                                        {
+                                            Sections = context.Sections,
+                                            RootFilePath = context.RootFilePath,
+                                            InputFilePath = resolveResult.ResolvedPath,
+                                            InputFileContents = new StringReader(SafeFileReader.ReadAllText(resolveResult.ResolvedPath))
+                                        };
+
+                                        returnValue = ProcessFile(includeContext);
                                     }
                                     else
                                     {
-                                        returnValue = SafeFileReader.ReadAllText(includePath);
+                                        returnValue = SafeFileReader.ReadAllText(resolveResult.ResolvedPath);
                                     }
+                                
+                                    _variableStack.Pop();
                                 }
                                 else
                                 {
-                                    if (inputFilePath != null)
-                                    {
-                                        returnValue = $"<div style='background-color:#b53b95; color: white; padding:10px; border-radius: 5px; margin: 3px; font-family:monospace'>Include \"{includePath}\" not found when processing \"{inputFilePath}\" on line {lineCount}</div>";
-                                    }
-                                    else
-                                    {
-                                        returnValue = $"<div style='background-color:#b53b95; color: white; padding:10px; border-radius: 5px; margin: 3px; font-family:monospace'>Include \"{includePath}\" not found when processing embedded markdown on line {lineCount}</div>";
-                                    }
+                                    returnValue = OutputHTMLError($"Include \"{resolveResult.RequestedFile}\" not found." +
+                                                                  "<div>Searched For: <ul>" + string.Join("", resolveResult.PathsSearched.Select(x => "<li>" + x + "</li>")) + "</ul></div>",
+                                                                  context.InputFilePath, lineCount);
                                 }
-
-                                _variableStack.Pop();
 
                                 return returnValue;
                             }
@@ -441,53 +542,77 @@ namespace StaticSiteGenerator
                         }
                         else
                         {
-                            // Unknown command - see if we have a matching section names or variables. Only check the sections if we're processing a layout file
-                            // as they're not allowed in included files.
-                            if (contentSectionsToInsert != null)
+                            // Unknown command - see if we have a matching section names or variables.
+                            // It's possible to have multiple sections with the same name if they comes from 
+                            // different include files, so concatenate all matches.
+                            StringBuilder sectionContent = new StringBuilder();
+                            bool foundSectionMatch = false;
+
+                            foreach (var section in context.Sections)
                             {
-                                foreach (var section in contentSectionsToInsert)
+                                if (string.Compare(section.Name, command, ignoreCase: true) == 0)
                                 {
-                                    if (string.Compare(section.Name, command, ignoreCase: true) == 0)
-                                    {
-                                        return section.Content.ToString();
-                                    }
+                                    foundSectionMatch = true;
+                                    sectionContent.AppendLine(section.Content.ToString());
                                 }
                             }
-                            else
+
+                            if (foundSectionMatch)
                             {
-                                return ProcessVariable("$(" + command + ")");
+                                return sectionContent.ToString();
                             }
+
+                            return ProcessVariable("$(" + command + ")");
                         }
 
                         return string.Empty;
                     });
 
-                    currentContentSection.Content.AppendLine(processedOutput);
+                    if (currentSection != null)
+                    {
+                        currentSection.Content.AppendLine(processedOutput);
+                    }
+                    else
+                    {
+                        currentOutput.AppendLine(processedOutput);
+                    }
                 }
             }
 
             if (layoutToUse != null)
             {
-                return ProcessFile(Path.Combine(_inputDirectory, c_layoutDirectory, layoutToUse), sections);
+                context.Sections.Add(new ContentSection() { Name = "content", Content = currentOutput });
+
+                return ProcessLayoutFile(Path.Combine(_inputDirectory, c_layoutDirectory, layoutToUse), context);
             }
             else
             {
-                return defaultContentSection.Content.ToString();
+                return currentOutput.ToString();
             }
         }
 
-        private static string ResolveFilePath(IEnumerable<string> pathsInPriorityOrder, string filename)
+        private static PathResolveResult ResolveFilePath(IEnumerable<string> pathsInPriorityOrder, string filename)
         {
+            PathResolveResult result = new()
+            {
+                RequestedFile = filename
+            };
+
             foreach (var path in pathsInPriorityOrder)
             {
                 string fullPath = Path.Combine(path, filename);
+
+                result.PathsSearched.Add(fullPath);
+
                 if (File.Exists(fullPath))
                 {
-                    return fullPath;
+                    result.ResolvedPath = fullPath;
+                    result.Status = PathResolveResult.StatusType.Success;
+                    return result;
                 }
             }
 
-            return null;
+            return result;
         }
 
         private string ProcessVariable(string variable)
@@ -559,6 +684,22 @@ namespace StaticSiteGenerator
                 }
 
                 File.WriteAllText(path, text);
+            }
+        }
+
+        private static string OutputHTMLError(string text, string file, int line)
+        {
+            string fileText = (file != null) ? $"\"{file}\"" :
+                                               $"embedded markdown";
+
+            return $"<div style='background-color:#b53b95; color: white; padding:10px; border-radius: 5px; margin: 3px; font-family:monospace'>{text}<div>In {fileText} on line {line}.</div>";
+        }
+
+        private static void DebugLog(string text)
+        {
+            if (_debugLogEnabled)
+            {
+                Console.WriteLine(text);
             }
         }
 
