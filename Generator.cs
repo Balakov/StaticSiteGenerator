@@ -67,6 +67,10 @@ namespace StaticSiteGenerator
         private Regex _relativeAssetLink = new Regex(@"""(?<link>assets/\S+?)""|'(?<link>assets/\S+?)'");
         // Relative link: href="file.html"
         private Regex _relativePageLink = new Regex(@"href\s*=\s*(""(?<link>\S+?)""|'(?<link>\S+?)')");
+        // {{ section vetbatim }}
+        private Regex _verbatimStartMarker = new Regex(@"{{\s*verbatim\s*}}");
+        // {{ endsection vetbatim }}
+        private Regex _verbatimEndMarker = new Regex(@"{{\s*endverbatim\s*}}");
 
         private VariableStack _variableStack = new();
         private FileIgnoreList _fileIgnoreList = new();
@@ -297,6 +301,7 @@ namespace StaticSiteGenerator
 
             StringBuilder currentOutput = new StringBuilder();
             ContentSection currentSection = null;
+            bool writeVerbatim = false; // If this is true we won't perform any processing on the lines and output the content vebatim.
 
             string layoutToUse = null;
 
@@ -347,6 +352,32 @@ namespace StaticSiteGenerator
                     }
                 }
 
+                // Check for verbatim output start and end markers
+                if (_verbatimStartMarker.IsMatch(line))
+                {
+                    writeVerbatim = true;
+                }
+                else if (_verbatimEndMarker.IsMatch(line))
+                {
+                    writeVerbatim = false;
+                }
+                else
+                {
+                    if (writeVerbatim)
+                    {
+                        if (currentSection != null)
+                        {
+                            currentSection.Content.AppendLine(line);
+                        }
+                        else
+                        {
+                            currentOutput.AppendLine(line);
+                        }
+
+                        continue;
+                    }
+                }
+
                 // Variable setter
                 if (line.StartsWith("$("))
                 {
@@ -354,6 +385,8 @@ namespace StaticSiteGenerator
                 }
                 else
                 {
+                    // Process any {{ }} commands
+
                     string processedOutput = _commandRegex.Replace(line, commandMatch =>
                     {
                         string commandString = commandMatch.Groups["command"].Value;
@@ -556,6 +589,7 @@ namespace StaticSiteGenerator
 
             if (layoutToUse != null)
             {
+                // Add a "content" section containing all of the output generated so far and send it to the layout file.
                 context.Sections.Add(new ContentSection() { Name = "content", Content = currentOutput });
 
                 return ProcessLayoutFile(Path.Combine(_inputDirectory, c_layoutDirectory, layoutToUse), context);
