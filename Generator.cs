@@ -44,6 +44,7 @@ namespace StaticSiteGenerator
         private const string c_htmlDirectory = "html";
         private const string c_pagesDirectory = "pages";
         private const string c_markdownDirectory = "markdown";
+        private const string c_rootFilesDirectory = "rootfiles";
 
         private string _inputDirectory;
         private string _outputDirectory;
@@ -60,7 +61,7 @@ namespace StaticSiteGenerator
         private Regex _variableUseageRegex = new Regex(@"(?<key>\$\(.*?\))");
         // Variable assigment: {{ $(var) = "value" }}
         private Regex _variableAssignmentRegex = new Regex(@"\$\(.*?\)\s*=\s*(""(?:[^""]).*?""|'(?:[^']).*?')");
-        // Ternary Expression: {{ $(var) == "x" ? "true" : "false"
+        // Ternary Expression: {{ $(var) == "x" ? "true" : "false" }}
         private Regex _variableTernary = new Regex(@"(?<key>\$\(.*?\))\s*==\s*[""'](?<checkvalue>.*)[""']\s*\?\s*[""'](?<truevalue>.*)[""']\s*:\s*[""'](?<falsevalue>.*)[""']");
         // Relative asset link: "assets/"
         private Regex _relativeAssetLink = new Regex(@"""(?<link>assets/\S+?)""|'(?<link>assets/\S+?)'");
@@ -214,45 +215,19 @@ namespace StaticSiteGenerator
             {
                 foreach (string file in Directory.GetFiles(rootAssetsPath, "*", SearchOption.AllDirectories))
                 {
-                    if (!_fileIgnoreList.ShouldCopy(file))
-                    {
-                        continue;
-                    }
-
                     string destinationPath = rootDestinationPath + file.Substring(rootAssetsPath.Length);
-                    string destinationDirectory = Path.GetDirectoryName(destinationPath);
+                    SafeFileCopy.Copy(file, destinationPath, _fileIgnoreList);
+                }
+            }
 
-                    if (!Directory.Exists(destinationDirectory))
-                    {
-                        Directory.CreateDirectory(destinationDirectory);
-                    }
+            // Copy any files in the rootfiles directory to the output directory
+            string rootFilesDirectory = Path.Combine(_inputDirectory, c_rootFilesDirectory);
 
-                    FileInfo sourceFileInfo = new FileInfo(file);
-                    FileInfo destinationFileInfo = new FileInfo(destinationPath);
-
-                    if (!destinationFileInfo.Exists ||
-                        destinationFileInfo.LastWriteTimeUtc < sourceFileInfo.LastWriteTimeUtc)
-                    {
-                        // Sometimes the file copy may fail because the browser is accessing the file - retry a few times
-                        int counter = 10;
-                        while (counter > 0)
-                        {
-                            try
-                            {
-                                File.Copy(file, destinationPath.TrimEnd(), true);
-                                break;
-                            }
-                            catch
-                            {
-                                counter--;
-                            }
-                        }
-
-                        if (counter == 0)
-                        {
-                            Console.WriteLine($"File copy failed for {destinationPath} - probably in-use.");
-                        }
-                    }
+            if (Directory.Exists(rootFilesDirectory))
+            {
+                foreach (string file in Directory.GetFiles(rootFilesDirectory))
+                {
+                    SafeFileCopy.Copy(file, Path.Combine(_outputDirectory, Path.GetFileName(file)), _fileIgnoreList);
                 }
             }
         }

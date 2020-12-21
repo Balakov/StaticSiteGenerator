@@ -2,7 +2,7 @@
   "profiles": {
     "StaticSiteGenerator": {
       "commandName": "Project",
-      "commandLineArgs": "D:\\GoogleDrive\\Mike\\Code\\FoghornWebsite --watch --serve"
+      "commandLineArgs": "D:\\GoogleDrive\\Mike\\Code\\mikestimpson.com --watch --serve"
     }
   }
 }

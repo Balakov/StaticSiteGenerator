@@ -92,7 +92,8 @@ namespace StaticSiteGenerator
                 "layout",
                 "html",
                 "pages",
-                "markdown"
+                "markdown",
+                "rootfiles"
             };
 
             foreach (var watchedDirectory in watchedDirectories)
