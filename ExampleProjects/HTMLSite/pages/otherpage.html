@@ -1,0 +1,26 @@
+<!-- Set the layout file to use. All of the content generated from this file will be inserted into the {{ content }} section of the layout file -->
+{{ layout default_layout.html }}
+
+<!-- Set a variable that's picked up in the nav.html included in the layout to set the activate navigation highlight -->
+$(active-nav) = "otherpage"
+
+<!-- We can define custom sections anywhere on the page and use them later on, or within included files -->
+{{ section MySection }}
+    <div class="card card-body">This is content inside MySection. Sections allows us to send content to included files, or just use them later on the page.</div>
+{{ endsection }}
+
+<div class="text-center">
+    <h2>This is another page</h2>
+
+<!-- Verbatim sections are output without any processing. This allows use to print out the "dump-vars" command without it executing -->
+{{ verbatim}}
+    <p>We can show all of the active variables and sections that this page can access. We use the {{ dump-vars }} command for this.
+{{ endverbatim}}
+
+</div>
+
+<!-- This is a debugging aid that shows all of the available variables and sections in-use -->
+{{ dump-vars }}
+
+<!-- Write out the content of the section -->
+{{ MySection }}

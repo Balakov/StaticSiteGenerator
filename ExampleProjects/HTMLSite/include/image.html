@@ -1,0 +1,9 @@
+<div class="col-4">
+    <div class="card">
+        <img class="card-img-top" src="https://placehold.it/{{ image-size }}" alt="Card image cap">
+        <div class="card-body">
+            <h5 class="card-title">{{ image-size }} x {{ image-size }} image</h5>
+            {{ include-if $(image-title) image-optional-title.html }}
+        </div>
+    </div>
+</div>

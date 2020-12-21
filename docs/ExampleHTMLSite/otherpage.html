@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8">
+    <!-- Set the title of the site to the "site.title" variable which can be defined globally in variables.txt, or overidden in any of the pages -->
+    <title>Static Site Generator Example</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css" integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
+    
+    <style>
+        header h1 {
+            text-align: center;
+            margin: 30px;
+        }
+        
+        nav {
+            margin-bottom: 20px;
+        }
+        
+        .nav-item.active {
+            text-decoration: underline;
+        }
+    </style>
+    
+    <!-- insert the content of any sections named "styles" in included files -->
+    
+
+    <script>
+        <!-- If the site is built with --watch then insert live.js to poll the server for changes -->
+        
+    </script>
+
+    <!-- insert the content of any sections named "scripts" in included files -->
+    
+  </head>
+  <body>
+    <div class="container">
+        <!-- include the header HTML from the include directory -->
+        <header>
+    <h1>Static Site Generator</h1>
+</header>
+
+        <!-- include the navigation HTML from the include directory -->
+        <nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <a class="navbar-brand" href="#">Navbar</a>
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="navbarNav">
+    <ul class="navbar-nav">
+      <li class="nav-item ">
+        <a class="nav-link" href="index.html">Home</a>
+      </li>
+      <li class="nav-item active">
+        <a class="nav-link" href="otherpage.html">Another Page</a>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+    
+        <!-- Insert all of the content generated from files that use this file as their layout -->
+        <!-- Set the layout file to use. All of the content generated from this file will be inserted into the  section of the layout file -->
+
+
+<!-- Set a variable that's picked up in the nav.html included in the layout to set the activate navigation highlight -->
+
+<!-- We can define custom sections anywhere on the page and use them later on, or within included files -->
+
+
+<div class="text-center">
+    <h2>This is another page</h2>
+
+<!-- Verbatim sections are output without any processing. This allows use to print out the "dump-vars" command without it executing -->
+
+    <p>We can show all of the active variables and sections that this page can access. We use the {{ dump-vars }} command for this.
+
+
+</div>
+
+<!-- This is a debugging aid that shows all of the available variables and sections in-use -->
+<h5>Variables</h5><ul><li>(Level 1) - "$(active-nav)" = "otherpage"</li><li>(Level 0) - "$(site.title)" = "Static Site Generator Example"</li></ul><h5>Sections</h5><ul>
+<li>MySection</li>
+</ul>
+
+
+<!-- Write out the content of the section -->
+
+    <div class="card card-body">This is content inside MySection. Sections allows us to send content to included files, or just use them later on the page.</div>
+
+
+
+
+    </div>
+
+    <!-- include the footer HTML from the include directory -->
+    <footer class="text-center my-5">
+    <!-- We can insert the current date and time using C# date format strings 
+         https://docs.microsoft.com/en-us/dotnet/standard/base-types/custom-date-and-time-format-strings -->
+    <small class="text-muted">This site was generated on Monday 21 December 2020 at 10:12 AM</small>
+</footer>
+
+
+
+  </body>
+</html>

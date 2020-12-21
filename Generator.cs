@@ -217,10 +217,13 @@ namespace StaticSiteGenerator
 
             foreach (string rootAssetsPath in rootAssetsPaths)
             {
-                foreach (string file in Directory.GetFiles(rootAssetsPath, "*", SearchOption.AllDirectories))
+                if (Directory.Exists(rootAssetsPath))
                 {
-                    string destinationPath = rootDestinationPath + file.Substring(rootAssetsPath.Length);
-                    SafeFileCopy.Copy(file, destinationPath, _fileIgnoreList);
+                    foreach (string file in Directory.GetFiles(rootAssetsPath, "*", SearchOption.AllDirectories))
+                    {
+                        string destinationPath = rootDestinationPath + file.Substring(rootAssetsPath.Length);
+                        SafeFileCopy.Copy(file, destinationPath, _fileIgnoreList);
+                    }
                 }
             }
 
@@ -395,18 +398,21 @@ namespace StaticSiteGenerator
 
                         if (command.StartsWith("$("))
                         {
-                            return ProcessVariable(command);
+                            return ProcessVariable(commandString);
                         }
                         else if (command == "debug-vars" || command == "dump-vars")
                         {
                             StringBuilder debugOutput = new("<h5>Variables</h5><ul>" + _variableStack.Print("<li>", "</li>") + "</ul>");
 
-                            debugOutput.AppendLine("<h5>Sections</h5><ul>");
-                            foreach (var section in context.Sections)
+                            if (context.Sections.Count > 0)
                             {
-                                debugOutput.AppendLine($"<li>{section.Name}</li>");
+                                debugOutput.AppendLine("<h5>Sections</h5><ul>");
+                                foreach (var section in context.Sections)
+                                {
+                                    debugOutput.AppendLine($"<li>{section.Name}</li>");
+                                }
+                                debugOutput.AppendLine("</ul>");
                             }
-                            debugOutput.AppendLine("</ul>");
 
                             return debugOutput.ToString();
                         }

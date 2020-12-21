@@ -1,0 +1,40 @@
+<!-- Set the layout file to use. All of the content generated from this file will be inserted into the {{ content }} section of the layout file -->
+{{ layout default_layout.html }}
+
+<!-- We can override the site title per-page -->
+$(site.title) = "Static Site Generator Index"
+<!-- Set a variable that's picked up in the nav.html included in the layout to set the activate navigation highlight -->
+$(active-nav) = "home"
+
+<!-- You can write regular HTML -->
+<h2>HTML</h2>
+<p>This is standard HTML text.<p>
+
+<!-- Or you can add content via inline markdown -->
+{{ section markdown }}
+##Markdown
+
+This is some example text that's generated via inline markdown text
+
+- Option 1
+- Option 2
+- Option 3
+{{ endsection }}
+
+<p>We can pass variables to included files to customise content.</p>
+
+<div class="row">
+    {{ include image.html $(image-size)="100x50" $(image-title)="This is an optional description of the image." }}
+    {{ include image.html $(image-size)="200x100" }}
+    {{ include image.html $(image-size)="300x150" }}
+</div>
+
+<!-- You can add page-specific styles -->
+{{ section styles }}
+<style>
+    h2 {
+        padding: 10px;
+        background-color: #ddd;
+    }
+</style>
+{{ endsection }}
