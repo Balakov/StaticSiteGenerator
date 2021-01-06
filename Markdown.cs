@@ -6,7 +6,6 @@ namespace StaticSiteGenerator
     {
         // Configure the pipeline with all advanced extensions active
         private readonly MarkdownPipeline _pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions()
-                                                                                   .UseBootstrap()
                                                                                    .Build();
 
         public string Transform(string markdown)
