@@ -1,5 +1,4 @@
-﻿using MarkdownSharp;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -51,7 +50,7 @@ namespace StaticSiteGenerator
         private bool _includeDebug;
         private static bool _debugLogEnabled = false;
 
-        private readonly Markdown _markdown = new Markdown();
+        private readonly MarkdownProcessor _markdown = new MarkdownProcessor();
 
         // Command: {{ include x.html }}
         private Regex _commandRegex = new Regex(@"{{\s*(?<command>.*?)\s*}}");
