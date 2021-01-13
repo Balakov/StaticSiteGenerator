@@ -1,4 +1,5 @@
 ﻿using Markdig;
+using Markdig.SyntaxHighlighting;
 
 namespace StaticSiteGenerator
 {
@@ -6,6 +7,7 @@ namespace StaticSiteGenerator
     {
         // Configure the pipeline with all advanced extensions active
         private readonly MarkdownPipeline _pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions()
+                                                                                   //.UseSyntaxHighlighting()
                                                                                    .Build();
 
         public string Transform(string markdown)

@@ -708,7 +708,7 @@ namespace StaticSiteGenerator
                     Directory.CreateDirectory(outputFileDirectory);
                 }
 
-                File.WriteAllText(path, text);
+                SafeFileWriter.Write(path, text);
             }
         }
 
