@@ -2,7 +2,7 @@
   "profiles": {
     "StaticSiteGenerator": {
       "commandName": "Project",
-      "commandLineArgs": "D:\\GoogleDrive\\Mike\\Code\\StaticSiteGenerator\\ExampleProjects\\MarkdownSite --watch --serve"
+      "commandLineArgs": "--input E:\\p4\\fone.mainline\\external\\online_services\\Documentation\\src --output E:\\p4\\fone.mainline\\external\\online_services\\Documentation --watch --serve"
     }
   }
 }

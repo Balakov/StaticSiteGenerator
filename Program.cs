@@ -17,6 +17,7 @@ namespace StaticSiteGenerator
         private static string _outputDirectory;
         private static bool _shouldServe = false;
         private static bool _shouldWatch = false;
+        private static bool _generateSiteMap = true;
 
         static void Main(string[] args)
         {
@@ -31,6 +32,10 @@ namespace StaticSiteGenerator
                 else if (arg == "--watch" || arg == "-w")
                 {
                     _shouldWatch = true;
+                }
+                else if (arg == "--nositemap")
+                {
+                    _generateSiteMap = false;
                 }
                 else if (arg == "--output" || arg == "-o" && i + 1 < args.Length)
                 {
@@ -52,7 +57,7 @@ namespace StaticSiteGenerator
 
             if (string.IsNullOrEmpty(_inputDirectory))
             {
-                Console.WriteLine("Usage: StaticSiteGenerator --input <directory> [--output <directory>] [--watch] [--serve]");
+                Console.WriteLine("Usage: StaticSiteGenerator --input <directory> [--output <directory>] [--watch] [--serve] [--nositemap]");
             }
 
             if (string.IsNullOrEmpty(_outputDirectory))
@@ -60,7 +65,7 @@ namespace StaticSiteGenerator
                 _outputDirectory = Path.Combine(_inputDirectory, c_outputDirectory);
             }
 
-            GenerateSite(_shouldWatch && _shouldServe);
+            GenerateSite(_shouldWatch && _shouldServe, _generateSiteMap);
 
             if(_shouldServe)
             {
@@ -74,9 +79,9 @@ namespace StaticSiteGenerator
             }
         }
 
-        static void GenerateSite(bool includeDebug)
+        static void GenerateSite(bool includeDebug, bool generateSitemap)
         {
-            _generator.Generate(_inputDirectory, _outputDirectory, includeDebug);
+            _generator.Generate(_inputDirectory, _outputDirectory, includeDebug, generateSitemap);
         }
 
         static void AddWatchers()
@@ -124,7 +129,7 @@ namespace StaticSiteGenerator
                 if (_watcher.ChangesDetected)
                 {
                     _watcher.ChangesDetected = false;
-                    GenerateSite(_shouldWatch && _shouldServe);
+                    GenerateSite(_shouldWatch && _shouldServe, _generateSiteMap);
                 }
 
                 System.Threading.Thread.Sleep(500);

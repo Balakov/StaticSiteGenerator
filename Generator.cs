@@ -1,5 +1,4 @@
-﻿using MarkdownSharp;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -51,7 +50,7 @@ namespace StaticSiteGenerator
         private bool _includeDebug;
         private static bool _debugLogEnabled = false;
 
-        private readonly Markdown _markdown = new Markdown();
+        private readonly MarkdownProcessor _markdown = new MarkdownProcessor();
 
         // Command: {{ include x.html }}
         private Regex _commandRegex = new Regex(@"{{\s*(?<command>.*?)\s*}}");
@@ -75,7 +74,7 @@ namespace StaticSiteGenerator
         private VariableStack _variableStack = new();
         private FileIgnoreList _fileIgnoreList = new();
 
-        public void Generate(string inputDirectory, string outputDirectory, bool includeDebug)
+        public void Generate(string inputDirectory, string outputDirectory, bool includeDebug, bool generateSitemap)
         {
             _inputDirectory = inputDirectory;
             _outputDirectory = outputDirectory;
@@ -152,7 +151,7 @@ namespace StaticSiteGenerator
                         {
                             string link = linkMatch.Groups["link"].Value;
 
-                            if (!link.Contains("://"))
+                            if (!link.Contains("://") && !link.StartsWith('#'))
                             {
                                 for (int i = 0; i < depthFromRoot; i++)
                                 {
@@ -193,11 +192,14 @@ namespace StaticSiteGenerator
 
             // Create a sitemap and robots.txt
 
-            var baseURL = _variableStack.Get("$(site.url)");
+            if (generateSitemap)
+            {
+                var baseURL = _variableStack.Get("$(site.url)");
 
-            string sitemapContents = CreateSiteMap(siteURLs, baseURL);
-            WriteTextIfChanged(Path.Combine(_outputDirectory, "sitemap.xml"), sitemapContents);
-            WriteTextIfChanged(Path.Combine(_outputDirectory, "robots.txt"), $"Sitemap: {baseURL}/sitemap.xml");
+                string sitemapContents = CreateSiteMap(siteURLs, baseURL);
+                WriteTextIfChanged(Path.Combine(_outputDirectory, "sitemap.xml"), sitemapContents);
+                WriteTextIfChanged(Path.Combine(_outputDirectory, "robots.txt"), $"Sitemap: {baseURL}/sitemap.xml");
+            }
 
             // Copy the assets to the output directory - TODO: Minification here?
             // Search for assets subdirectories within the pages and html directories as well.
@@ -419,6 +421,14 @@ namespace StaticSiteGenerator
                         else if (command == "layout")
                         {
                             layoutToUse = (parts.Length > 0) ? parts[1] : null;
+
+                            // Process any variable assignments to be passed to the layout
+                            var variableAssignmentMatches = _variableAssignmentRegex.Matches(commandString);
+                            foreach (Match match in variableAssignmentMatches)
+                            {
+                                _variableStack.AddVariable(match.Value);
+                            }
+
                             return string.Empty;
                         }
                         else if (command == "section" && parts.Length > 1)
@@ -698,7 +708,7 @@ namespace StaticSiteGenerator
                     Directory.CreateDirectory(outputFileDirectory);
                 }
 
-                File.WriteAllText(path, text);
+                SafeFileWriter.Write(path, text);
             }
         }
 
